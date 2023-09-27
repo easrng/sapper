@@ -2,16 +2,16 @@
 
 function _interopDefault (ex) { return (ex && (typeof ex === 'object') && 'default' in ex) ? ex['default'] : ex; }
 
-var EventEmitter = require('events');
-var EventEmitter__default = _interopDefault(EventEmitter);
+var events = require('events');
+var events__default = _interopDefault(events);
 var fs = require('fs');
 var fs__default = _interopDefault(fs);
 var util = require('util');
 var util__default = _interopDefault(util);
 
-const readdir$1 = util.promisify(fs.readdir);
-const stat$1 = util.promisify(fs.stat);
-class CheapWatch extends EventEmitter {
+const readdir = util.promisify(fs.readdir);
+const stat = util.promisify(fs.stat);
+class CheapWatch extends events.EventEmitter {
     constructor(data) {
         super();
         this.watch = true;
@@ -57,7 +57,7 @@ class CheapWatch extends EventEmitter {
     }
     async _recurse(full) {
         const path = full.slice(this.dir.length + 1);
-        const stats = await stat$1(full);
+        const stats = await stat(full);
         if (path) {
             if (this.filter && !(await this.filter({ path, stats }))) {
                 return;
@@ -68,17 +68,20 @@ class CheapWatch extends EventEmitter {
             if (this.watch) {
                 this._watchers.set(path, fs.watch(full, this._handle.bind(this, full)).on('error', () => { }));
             }
-            await Promise.all((await readdir$1(full)).map(sub => this._recurse(full + '/' + sub)));
+            await Promise.all((await readdir(full)).map(sub => this._recurse(full + '/' + sub)));
         }
     }
     _handle(dir, event, file) {
-        const full = dir + '/' + file;
-        if (this._timeouts.has(full)) {
-            clearTimeout(this._timeouts.get(full));
+        this._debounce(dir);
+        this._debounce(dir + '/' + file);
+    }
+    _debounce(path) {
+        if (this._timeouts.has(path)) {
+            clearTimeout(this._timeouts.get(path));
         }
-        this._timeouts.set(full, setTimeout(() => {
-            this._timeouts.delete(full);
-            this._enqueue(full);
+        this._timeouts.set(path, setTimeout(() => {
+            this._timeouts.delete(path);
+            this._enqueue(path);
         }, this.debounce));
     }
     async _enqueue(full) {
@@ -90,7 +93,7 @@ class CheapWatch extends EventEmitter {
         while (this._queue.length) {
             const full = this._queue.shift();
             const path = full.slice(this.dir.length + 1);
-            const stats = await stat$1(full).catch(() => { });
+            const stats = await stat(full).catch(() => { });
             if (stats) {
                 if (this.filter && !(await this.filter({ path, stats }))) {
                     continue;
@@ -102,9 +105,9 @@ class CheapWatch extends EventEmitter {
                 }
                 if (stats.isDirectory() && !this._watchers.has(path)) {
                     await this._recurse(full);
-                    for (const [newPath, stats] of this.paths.entries()) {
-                        if (newPath.startsWith(path + '/')) {
-                            this.emit('+', { path: newPath, stats, isNew: true });
+                    for (const [new_path, stats] of this.paths.entries()) {
+                        if (new_path.startsWith(path + '/')) {
+                            this.emit('+', { path: new_path, stats, isNew: true });
                         }
                     }
                 }
@@ -114,17 +117,17 @@ class CheapWatch extends EventEmitter {
                 this.paths.delete(path);
                 this.emit('-', { path, stats });
                 if (this._watchers.has(path)) {
-                    for (const old of this._watchers.keys()) {
-                        if (old === path || old.startsWith(path + '/')) {
-                            this._watchers.get(old).close();
-                            this._watchers.delete(old);
+                    for (const old_path of this._watchers.keys()) {
+                        if (old_path === path || old_path.startsWith(path + '/')) {
+                            this._watchers.get(old_path).close();
+                            this._watchers.delete(old_path);
                         }
                     }
-                    for (const old of this.paths.keys()) {
-                        if (old.startsWith(path + '/')) {
-                            const stats = this.paths.get(old);
-                            this.paths.delete(old);
-                            this.emit('-', { path: old, stats });
+                    for (const old_path of this.paths.keys()) {
+                        if (old_path.startsWith(path + '/')) {
+                            const stats = this.paths.get(old_path);
+                            this.paths.delete(old_path);
+                            this.emit('-', { path: old_path, stats });
                         }
                     }
                 }

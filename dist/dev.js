@@ -4,7 +4,7 @@ Object.defineProperty(exports, '__esModule', { value: true });
 
 function _interopDefault (ex) { return (ex && (typeof ex === 'object') && 'default' in ex) ? ex['default'] : ex; }
 
-var tslib_1 = require('tslib');
+var tslib = require('tslib');
 var path = require('path');
 var path__default = _interopDefault(path);
 var fs = require('fs');
@@ -12,10 +12,10 @@ var fs__default = _interopDefault(fs);
 var http = require('http');
 var http__default = _interopDefault(http);
 var child_process = require('child_process');
-var __chunk_1 = require('./chunk-9618d369.js');
-var __chunk_3 = require('./chunk-275bacad.js');
-var EventEmitter = require('events');
-var EventEmitter__default = _interopDefault(EventEmitter);
+var __chunk_1 = require('./chunk-6df54622.js');
+var __chunk_3 = require('./chunk-60dc40b2.js');
+var events = require('events');
+var events__default = _interopDefault(events);
 var core = require('./core.js');
 var __chunk_6 = require('./chunk-51f4730b.js');
 require('net');
@@ -34,7 +34,7 @@ function dev(opts) {
     return new Watcher(opts);
 }
 var Watcher = /** @class */ (function (_super) {
-    tslib_1.__extends(Watcher, _super);
+    tslib.__extends(Watcher, _super);
     function Watcher(_a) {
         var _b = _a.cwd, cwd = _b === void 0 ? '.' : _b, _c = _a.src, src = _c === void 0 ? 'src' : _c, _d = _a.routes, routes = _d === void 0 ? 'src/routes' : _d, _e = _a.output, output = _e === void 0 ? '__sapper__' : _e, _f = _a.static, static_files = _f === void 0 ? 'static' : _f, _g = _a.dest, dest = _g === void 0 ? '__sapper__/dev' : _g, dev_port = _a["dev-port"], live = _a.live, hot = _a.hot, devtools_port = _a["devtools-port"], bundler = _a.bundler, _h = _a.port, port = _h === void 0 ? +process.env.PORT : _h;
         var _this = _super.call(this) || this;
@@ -76,10 +76,10 @@ var Watcher = /** @class */ (function (_super) {
         return _this;
     }
     Watcher.prototype.init = function () {
-        return tslib_1.__awaiter(this, void 0, void 0, function () {
+        return tslib.__awaiter(this, void 0, void 0, function () {
             var _a, _b, cwd, src, dest, routes, output, static_files, _c, _d, manifest_data, deferred, compilers, emitFatal, watch_serviceworker;
             var _this = this;
-            return tslib_1.__generator(this, function (_e) {
+            return tslib.__generator(this, function (_e) {
                 switch (_e.label) {
                     case 0:
                         if (!this.port) return [3 /*break*/, 2];
@@ -349,12 +349,12 @@ var Watcher = /** @class */ (function (_super) {
         });
     };
     return Watcher;
-}(EventEmitter.EventEmitter));
+}(events.EventEmitter));
 var INTERVAL = 10000;
 var DevServer = /** @class */ (function () {
     function DevServer(port, interval) {
-        if (interval === void 0) { interval = 10000; }
         var _this = this;
+        if (interval === void 0) { interval = 10000; }
         this.clients = new Set();
         this._ = http.createServer(function (req, res) {
             if (req.url !== '/__sapper__')

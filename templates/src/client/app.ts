@@ -198,14 +198,16 @@ function render(data: any, nullable_depth: number, scroll: ScrollPosition, noscr
 
 	if (!noscroll) {
 		if (hash) {
-			// scroll is an element id (from a hash), we need to compute y.
-			const deep_linked = document.querySelector(hash);
-			if (deep_linked) {
-				scroll = {
-					x: 0,
-					y: deep_linked.getBoundingClientRect().top
-				};
-			}
+			try {
+				// scroll is an element id (from a hash), we need to compute y.
+				const deep_linked = document.querySelector(hash);
+				if (deep_linked) {
+					scroll = {
+						x: 0,
+						y: deep_linked.getBoundingClientRect().top
+					};
+				}
+			} catch (e) {}
 		}
 
 		scroll_history[cid] = scroll;

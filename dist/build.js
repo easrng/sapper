@@ -4,12 +4,12 @@ Object.defineProperty(exports, '__esModule', { value: true });
 
 function _interopDefault (ex) { return (ex && (typeof ex === 'object') && 'default' in ex) ? ex['default'] : ex; }
 
-var tslib_1 = require('tslib');
+var tslib = require('tslib');
 var fs = require('fs');
 var fs__default = _interopDefault(fs);
 var path = require('path');
 var path__default = _interopDefault(path);
-var __chunk_3 = require('./chunk-275bacad.js');
+var __chunk_3 = require('./chunk-60dc40b2.js');
 var __chunk_7 = require('./chunk-fb4e1119.js');
 var core = require('./core.js');
 var __chunk_6 = require('./chunk-51f4730b.js');
@@ -27,9 +27,9 @@ require('./chunk-abdec9a5.js');
 
 function build(_a) {
     var _b = _a === void 0 ? {} : _a, cwd = _b.cwd, _c = _b.src, src = _c === void 0 ? 'src' : _c, _d = _b.routes, routes = _d === void 0 ? 'src/routes' : _d, _e = _b.output, output = _e === void 0 ? '__sapper__' : _e, _f = _b.static, static_files = _f === void 0 ? 'static' : _f, _g = _b.dest, dest = _g === void 0 ? '__sapper__/build' : _g, bundler = _b.bundler, _h = _b.legacy, legacy = _h === void 0 ? false : _h, _j = _b.oncompile, oncompile = _j === void 0 ? __chunk_3.noop : _j;
-    return tslib_1.__awaiter(this, void 0, void 0, function () {
+    return tslib.__awaiter(this, void 0, void 0, function () {
         var template, error, manifest_data, _k, client, server, serviceworker, client_result, build_info, client_1, client_result_1, server_stats, serviceworker_stats, client_files;
-        return tslib_1.__generator(this, function (_l) {
+        return tslib.__generator(this, function (_l) {
             switch (_l.label) {
                 case 0:
                     bundler = __chunk_6.validate_bundler(bundler);

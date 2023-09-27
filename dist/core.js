@@ -14,7 +14,7 @@ var __chunk_2 = require('./chunk-21b7786f.js');
 var hash = _interopDefault(require('string-hash'));
 var codec = require('sourcemap-codec');
 var prettyBytes = require('./pretty-bytes.js');
-var tslib_1 = require('tslib');
+var tslib = require('tslib');
 var __chunk_5 = require('./chunk-abdec9a5.js');
 
 function create_main_manifests(_a) {
@@ -423,10 +423,10 @@ var RollupCompiler = /** @class */ (function () {
         this.css_files = [];
     }
     RollupCompiler.prototype.get_config = function (mod) {
-        return tslib_1.__awaiter(this, void 0, void 0, function () {
+        return tslib.__awaiter(this, void 0, void 0, function () {
             var onwarn;
             var _this = this;
-            return tslib_1.__generator(this, function (_a) {
+            return tslib.__generator(this, function (_a) {
                 // TODO this is hacky, and doesn't need to apply to all three compilers
                 (mod.plugins || (mod.plugins = [])).push({
                     name: 'sapper-internal',
@@ -459,9 +459,9 @@ var RollupCompiler = /** @class */ (function () {
         this._oninvalid = cb;
     };
     RollupCompiler.prototype.compile = function () {
-        return tslib_1.__awaiter(this, void 0, Promise, function () {
+        return tslib.__awaiter(this, void 0, Promise, function () {
             var config, start, bundle, err_1;
-            return tslib_1.__generator(this, function (_a) {
+            return tslib.__generator(this, function (_a) {
                 switch (_a.label) {
                     case 0: return [4 /*yield*/, this._];
                     case 1:
@@ -494,10 +494,10 @@ var RollupCompiler = /** @class */ (function () {
         });
     };
     RollupCompiler.prototype.watch = function (cb) {
-        return tslib_1.__awaiter(this, void 0, void 0, function () {
+        return tslib.__awaiter(this, void 0, void 0, function () {
             var config, watcher;
             var _this = this;
-            return tslib_1.__generator(this, function (_a) {
+            return tslib.__generator(this, function (_a) {
                 switch (_a.label) {
                     case 0: return [4 /*yield*/, this._];
                     case 1:
@@ -547,9 +547,9 @@ var RollupCompiler = /** @class */ (function () {
         });
     };
     RollupCompiler.load_config = function (cwd) {
-        return tslib_1.__awaiter(this, void 0, void 0, function () {
+        return tslib.__awaiter(this, void 0, void 0, function () {
             var input, bundle, resp, code, defaultLoader, config;
-            return tslib_1.__generator(this, function (_a) {
+            return tslib.__generator(this, function (_a) {
                 switch (_a.label) {
                     case 0:
                         if (!rollup)
@@ -882,9 +882,9 @@ var WebpackCompiler = /** @class */ (function () {
 
 var WEBPACK_CONFIG_FILE = process.env.WEBPACK_CONFIG_FILE || 'webpack.config.js';
 function create_compilers(bundler, cwd, src, dest, dev) {
-    return tslib_1.__awaiter(this, void 0, Promise, function () {
+    return tslib.__awaiter(this, void 0, Promise, function () {
         var config, config;
-        return tslib_1.__generator(this, function (_a) {
+        return tslib.__generator(this, function (_a) {
             switch (_a.label) {
                 case 0:
                     __chunk_5.set_dev(dev);

@@ -9,8 +9,8 @@ var __chunk_2 = require('./chunk-21b7786f.js');
 var util = require('util');
 var util__default = _interopDefault(util);
 var assert = _interopDefault(require('assert'));
-var EventEmitter = require('events');
-var EventEmitter__default = _interopDefault(EventEmitter);
+var events = require('events');
+var events__default = _interopDefault(events);
 
 var _0777 = parseInt('0777', 8);
 
@@ -29,11 +29,11 @@ function mkdirP (p, opts, f, made) {
     var xfs = opts.fs || fs__default;
     
     if (mode === undefined) {
-        mode = _0777 & (~process.umask());
+        mode = _0777;
     }
     if (!made) made = null;
     
-    var cb = f || function () {};
+    var cb = f || /* istanbul ignore next */ function () {};
     p = __chunk_2.pathModule.resolve(p);
     
     xfs.mkdir(p, mode, function (er) {
@@ -43,7 +43,10 @@ function mkdirP (p, opts, f, made) {
         }
         switch (er.code) {
             case 'ENOENT':
+                /* istanbul ignore if */
+                if (__chunk_2.pathModule.dirname(p) === p) return cb(er);
                 mkdirP(__chunk_2.pathModule.dirname(p), opts, function (er, made) {
+                    /* istanbul ignore if */
                     if (er) cb(er, made);
                     else mkdirP(p, opts, cb, made);
                 });
@@ -73,7 +76,7 @@ mkdirP.sync = function sync (p, opts, made) {
     var xfs = opts.fs || fs__default;
     
     if (mode === undefined) {
-        mode = _0777 & (~process.umask());
+        mode = _0777;
     }
     if (!made) made = null;
 
@@ -98,9 +101,10 @@ mkdirP.sync = function sync (p, opts, made) {
                 try {
                     stat = xfs.statSync(p);
                 }
-                catch (err1) {
+                catch (err1) /* istanbul ignore next */ {
                     throw err0;
                 }
+                /* istanbul ignore if */
                 if (!stat.isDirectory()) throw err0;
                 break;
         }
@@ -528,6 +532,9 @@ function range(a, b, str) {
   var i = ai;
 
   if (ai >= 0 && bi > 0) {
+    if(a===b) {
+      return [ai, bi];
+    }
     begs = [];
     left = str.length;
 
@@ -755,10 +762,10 @@ function expand(str, isTop) {
 var minimatch_1 = minimatch;
 minimatch.Minimatch = Minimatch;
 
-var path$1 = { sep: '/' };
-try {
-  path$1 = __chunk_2.pathModule;
-} catch (er) {}
+var path$1 = (function () { try { return __chunk_2.pathModule } catch (e) {}}()) || {
+  sep: '/'
+};
+minimatch.sep = path$1.sep;
 
 var GLOBSTAR = minimatch.GLOBSTAR = Minimatch.GLOBSTAR = {};
 
@@ -810,43 +817,64 @@ function filter (pattern, options) {
 }
 
 function ext (a, b) {
-  a = a || {};
   b = b || {};
   var t = {};
-  Object.keys(b).forEach(function (k) {
-    t[k] = b[k];
-  });
   Object.keys(a).forEach(function (k) {
     t[k] = a[k];
+  });
+  Object.keys(b).forEach(function (k) {
+    t[k] = b[k];
   });
   return t
 }
 
 minimatch.defaults = function (def) {
-  if (!def || !Object.keys(def).length) return minimatch
+  if (!def || typeof def !== 'object' || !Object.keys(def).length) {
+    return minimatch
+  }
 
   var orig = minimatch;
 
   var m = function minimatch (p, pattern, options) {
-    return orig.minimatch(p, pattern, ext(def, options))
+    return orig(p, pattern, ext(def, options))
   };
 
   m.Minimatch = function Minimatch (pattern, options) {
     return new orig.Minimatch(pattern, ext(def, options))
+  };
+  m.Minimatch.defaults = function defaults (options) {
+    return orig.defaults(ext(def, options)).Minimatch
+  };
+
+  m.filter = function filter (pattern, options) {
+    return orig.filter(pattern, ext(def, options))
+  };
+
+  m.defaults = function defaults (options) {
+    return orig.defaults(ext(def, options))
+  };
+
+  m.makeRe = function makeRe (pattern, options) {
+    return orig.makeRe(pattern, ext(def, options))
+  };
+
+  m.braceExpand = function braceExpand (pattern, options) {
+    return orig.braceExpand(pattern, ext(def, options))
+  };
+
+  m.match = function (list, pattern, options) {
+    return orig.match(list, pattern, ext(def, options))
   };
 
   return m
 };
 
 Minimatch.defaults = function (def) {
-  if (!def || !Object.keys(def).length) return Minimatch
   return minimatch.defaults(def).Minimatch
 };
 
 function minimatch (p, pattern, options) {
-  if (typeof pattern !== 'string') {
-    throw new TypeError('glob pattern string required')
-  }
+  assertValidPattern(pattern);
 
   if (!options) options = {};
 
@@ -854,9 +882,6 @@ function minimatch (p, pattern, options) {
   if (!options.nocomment && pattern.charAt(0) === '#') {
     return false
   }
-
-  // "" only matches ""
-  if (pattern.trim() === '') return p === ''
 
   return new Minimatch(pattern, options).match(p)
 }
@@ -866,15 +891,14 @@ function Minimatch (pattern, options) {
     return new Minimatch(pattern, options)
   }
 
-  if (typeof pattern !== 'string') {
-    throw new TypeError('glob pattern string required')
-  }
+  assertValidPattern(pattern);
 
   if (!options) options = {};
+
   pattern = pattern.trim();
 
   // windows support: need to use /, not \
-  if (path$1.sep !== '/') {
+  if (!options.allowWindowsEscape && path$1.sep !== '/') {
     pattern = pattern.split(path$1.sep).join('/');
   }
 
@@ -885,6 +909,7 @@ function Minimatch (pattern, options) {
   this.negate = false;
   this.comment = false;
   this.empty = false;
+  this.partial = !!options.partial;
 
   // make the set of regexps etc.
   this.make();
@@ -894,9 +919,6 @@ Minimatch.prototype.debug = function () {};
 
 Minimatch.prototype.make = make;
 function make () {
-  // don't do it more than once.
-  if (this._made) return
-
   var pattern = this.pattern;
   var options = this.options;
 
@@ -916,7 +938,7 @@ function make () {
   // step 2: expand braces
   var set = this.globSet = this.braceExpand();
 
-  if (options.debug) this.debug = console.error;
+  if (options.debug) this.debug = function debug() { console.error.apply(console, arguments); };
 
   this.debug(this.pattern, set);
 
@@ -996,18 +1018,28 @@ function braceExpand (pattern, options) {
   pattern = typeof pattern === 'undefined'
     ? this.pattern : pattern;
 
-  if (typeof pattern === 'undefined') {
-    throw new TypeError('undefined pattern')
-  }
+  assertValidPattern(pattern);
 
-  if (options.nobrace ||
-    !pattern.match(/\{.*\}/)) {
+  // Thanks to Yeting Li <https://github.com/yetingli> for
+  // improving this regexp to avoid a ReDOS vulnerability.
+  if (options.nobrace || !/\{(?:(?!\{).)*\}/.test(pattern)) {
     // shortcut. no need to expand.
     return [pattern]
   }
 
   return braceExpansion(pattern)
 }
+
+var MAX_PATTERN_LENGTH = 1024 * 64;
+var assertValidPattern = function (pattern) {
+  if (typeof pattern !== 'string') {
+    throw new TypeError('invalid pattern')
+  }
+
+  if (pattern.length > MAX_PATTERN_LENGTH) {
+    throw new TypeError('pattern is too long')
+  }
+};
 
 // parse a component of the expanded set.
 // At this point, no pattern may contain "/" in it
@@ -1023,14 +1055,17 @@ function braceExpand (pattern, options) {
 Minimatch.prototype.parse = parse;
 var SUBPARSE = {};
 function parse (pattern, isSub) {
-  if (pattern.length > 1024 * 64) {
-    throw new TypeError('pattern is too long')
-  }
+  assertValidPattern(pattern);
 
   var options = this.options;
 
   // shortcuts
-  if (!options.noglobstar && pattern === '**') return GLOBSTAR
+  if (pattern === '**') {
+    if (!options.noglobstar)
+      return GLOBSTAR
+    else
+      pattern = '*';
+  }
   if (pattern === '') return ''
 
   var re = '';
@@ -1086,10 +1121,12 @@ function parse (pattern, isSub) {
     }
 
     switch (c) {
-      case '/':
+      /* istanbul ignore next */
+      case '/': {
         // completely not allowed, even escaped.
         // Should already be path-split by now.
         return false
+      }
 
       case '\\':
         clearStateChar();
@@ -1208,24 +1245,22 @@ function parse (pattern, isSub) {
 
         // handle the case where we left a class open.
         // "[z-a]" is valid, equivalent to "\[z-a\]"
-        if (inClass) {
-          // split where the last [ was, make sure we don't have
-          // an invalid re. if so, re-walk the contents of the
-          // would-be class to re-translate any characters that
-          // were passed through as-is
-          // TODO: It would probably be faster to determine this
-          // without a try/catch and a new RegExp, but it's tricky
-          // to do safely.  For now, this is safe and works.
-          var cs = pattern.substring(classStart + 1, i);
-          try {
-          } catch (er) {
-            // not a valid class!
-            var sp = this.parse(cs, SUBPARSE);
-            re = re.substr(0, reClassStart) + '\\[' + sp[0] + '\\]';
-            hasMagic = hasMagic || sp[1];
-            inClass = false;
-            continue
-          }
+        // split where the last [ was, make sure we don't have
+        // an invalid re. if so, re-walk the contents of the
+        // would-be class to re-translate any characters that
+        // were passed through as-is
+        // TODO: It would probably be faster to determine this
+        // without a try/catch and a new RegExp, but it's tricky
+        // to do safely.  For now, this is safe and works.
+        var cs = pattern.substring(classStart + 1, i);
+        try {
+        } catch (er) {
+          // not a valid class!
+          var sp = this.parse(cs, SUBPARSE);
+          re = re.substr(0, reClassStart) + '\\[' + sp[0] + '\\]';
+          hasMagic = hasMagic || sp[1];
+          inClass = false;
+          continue
         }
 
         // finish up the class.
@@ -1309,9 +1344,7 @@ function parse (pattern, isSub) {
   // something that could conceivably capture a dot
   var addPatternStart = false;
   switch (re.charAt(0)) {
-    case '.':
-    case '[':
-    case '(': addPatternStart = true;
+    case '[': case '.': case '(': addPatternStart = true;
   }
 
   // Hack to work around lack of negative lookbehind in JS
@@ -1373,7 +1406,7 @@ function parse (pattern, isSub) {
   var flags = options.nocase ? 'i' : '';
   try {
     var regExp = new RegExp('^' + re + '$', flags);
-  } catch (er) {
+  } catch (er) /* istanbul ignore next - should be impossible */ {
     // If it was an invalid regular expression, then it can't match
     // anything.  This trick looks for a character after the end of
     // the string, which is of course impossible, except in multi-line
@@ -1431,7 +1464,7 @@ function makeRe () {
 
   try {
     this.regexp = new RegExp(re, flags);
-  } catch (ex) {
+  } catch (ex) /* istanbul ignore next - should be impossible */ {
     this.regexp = false;
   }
   return this.regexp
@@ -1449,8 +1482,8 @@ minimatch.match = function (list, pattern, options) {
   return list
 };
 
-Minimatch.prototype.match = match;
-function match (f, partial) {
+Minimatch.prototype.match = function match (f, partial) {
+  if (typeof partial === 'undefined') partial = this.partial;
   this.debug('match', f, this.pattern);
   // short-circuit in the case of busted things.
   // comments, etc.
@@ -1503,7 +1536,7 @@ function match (f, partial) {
   // pattern, failure otherwise.
   if (options.flipNegate) return false
   return this.negate
-}
+};
 
 // set partial to true to test if, for example,
 // "/a/b" matches the start of "/*/b/*/d"
@@ -1532,6 +1565,7 @@ Minimatch.prototype.matchOne = function (file, pattern, partial) {
 
     // should be impossible.
     // some invalid regexp stuff in the set.
+    /* istanbul ignore if */
     if (p === false) return false
 
     if (p === GLOBSTAR) {
@@ -1605,6 +1639,7 @@ Minimatch.prototype.matchOne = function (file, pattern, partial) {
       // no match was found.
       // However, in partial mode, we can't say this is necessarily over.
       // If there's more *pattern* left, then
+      /* istanbul ignore if */
       if (partial) {
         // ran out of file
         this.debug('\n>>> no match, partial?', file, fr, pattern, pr);
@@ -1618,11 +1653,7 @@ Minimatch.prototype.matchOne = function (file, pattern, partial) {
     // patterns with magic have been turned into regexps.
     var hit;
     if (typeof p === 'string') {
-      if (options.nocase) {
-        hit = f.toLowerCase() === p.toLowerCase();
-      } else {
-        hit = f === p;
-      }
+      hit = f === p;
       this.debug('string match', p, f, hit);
     } else {
       hit = f.match(p);
@@ -1653,16 +1684,16 @@ Minimatch.prototype.matchOne = function (file, pattern, partial) {
     // this is ok if we're doing the match as part of
     // a glob fs traversal.
     return partial
-  } else if (pi === pl) {
+  } else /* istanbul ignore else */ if (pi === pl) {
     // ran out of pattern, still have file left.
     // this is only acceptable if we're on the very last
     // empty segment of a file with a trailing slash.
     // a/* should match a/b/
-    var emptyFileEnd = (fi === fl - 1) && (file[fi] === '');
-    return emptyFileEnd
+    return (fi === fl - 1) && (file[fi] === '')
   }
 
   // should be unreachable.
+  /* istanbul ignore next */
   throw new Error('wtf?')
 };
 
@@ -1675,36 +1706,46 @@ function regExpEscape (s) {
   return s.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&')
 }
 
+var commonjsGlobal = typeof globalThis !== 'undefined' ? globalThis : typeof window !== 'undefined' ? window : typeof global !== 'undefined' ? global : typeof self !== 'undefined' ? self : {};
+
 function unwrapExports (x) {
-	return x && x.__esModule && Object.prototype.hasOwnProperty.call(x, 'default') ? x.default : x;
+	return x && x.__esModule && Object.prototype.hasOwnProperty.call(x, 'default') ? x['default'] : x;
 }
 
 function createCommonjsModule(fn, module) {
 	return module = { exports: {} }, fn(module, module.exports), module.exports;
 }
 
+function getCjsExportFromNamespace (n) {
+	return n && n['default'] || n;
+}
+
 var inherits_browser = createCommonjsModule(function (module) {
 if (typeof Object.create === 'function') {
   // implementation from standard node.js 'util' module
   module.exports = function inherits(ctor, superCtor) {
-    ctor.super_ = superCtor;
-    ctor.prototype = Object.create(superCtor.prototype, {
-      constructor: {
-        value: ctor,
-        enumerable: false,
-        writable: true,
-        configurable: true
-      }
-    });
+    if (superCtor) {
+      ctor.super_ = superCtor;
+      ctor.prototype = Object.create(superCtor.prototype, {
+        constructor: {
+          value: ctor,
+          enumerable: false,
+          writable: true,
+          configurable: true
+        }
+      });
+    }
   };
 } else {
   // old school shim for old browsers
   module.exports = function inherits(ctor, superCtor) {
-    ctor.super_ = superCtor;
-    var TempCtor = function () {};
-    TempCtor.prototype = superCtor.prototype;
-    ctor.prototype = new TempCtor();
-    ctor.prototype.constructor = ctor;
+    if (superCtor) {
+      ctor.super_ = superCtor;
+      var TempCtor = function () {};
+      TempCtor.prototype = superCtor.prototype;
+      ctor.prototype = new TempCtor();
+      ctor.prototype.constructor = ctor;
+    }
   };
 }
 });
@@ -1712,9 +1753,11 @@ if (typeof Object.create === 'function') {
 var inherits = createCommonjsModule(function (module) {
 try {
   var util$$1 = util__default;
+  /* istanbul ignore next */
   if (typeof util$$1.inherits !== 'function') throw '';
   module.exports = util$$1.inherits;
 } catch (e) {
+  /* istanbul ignore next */
   module.exports = inherits_browser;
 }
 });
@@ -1740,8 +1783,6 @@ var win32_1 = win32;
 pathIsAbsolute.posix = posix_1;
 pathIsAbsolute.win32 = win32_1;
 
-var alphasort_1 = alphasort;
-var alphasorti_1 = alphasorti;
 var setopts_1 = setopts;
 var ownProp_1 = ownProp;
 var makeAbs_1 = makeAbs;
@@ -1757,14 +1798,11 @@ function ownProp (obj, field) {
 
 
 
+
 var Minimatch$1 = minimatch_1.Minimatch;
 
-function alphasorti (a, b) {
-  return a.toLowerCase().localeCompare(b.toLowerCase())
-}
-
 function alphasort (a, b) {
-  return a.localeCompare(b)
+  return a.localeCompare(b, 'en')
 }
 
 function setupIgnores (self, options) {
@@ -1823,6 +1861,7 @@ function setopts (self, pattern, options) {
   self.stat = !!options.stat;
   self.noprocess = !!options.noprocess;
   self.absolute = !!options.absolute;
+  self.fs = options.fs || fs__default;
 
   self.maxLength = options.maxLength || Infinity;
   self.cache = options.cache || Object.create(null);
@@ -1856,6 +1895,8 @@ function setopts (self, pattern, options) {
   // Note that they are not supported in Glob itself anyway.
   options.nonegate = true;
   options.nocomment = true;
+  // always treat \ in patterns as escapes, not path separators
+  options.allowWindowsEscape = false;
 
   self.minimatch = new Minimatch$1(pattern, options);
   self.options = self.minimatch.options;
@@ -1892,7 +1933,7 @@ function finish (self) {
     all = Object.keys(all);
 
   if (!self.nosort)
-    all = all.sort(self.nocase ? alphasorti : alphasort);
+    all = all.sort(alphasort);
 
   // at *some* point we statted all of these
   if (self.mark) {
@@ -1982,8 +2023,6 @@ function childrenIgnored (self, path$$1) {
 }
 
 var common = {
-	alphasort: alphasort_1,
-	alphasorti: alphasorti_1,
 	setopts: setopts_1,
 	ownProp: ownProp_1,
 	makeAbs: makeAbs_1,
@@ -1995,6 +2034,11 @@ var common = {
 
 var sync = globSync;
 globSync.GlobSync = GlobSync;
+
+
+
+
+
 var setopts$1 = common.setopts;
 var ownProp$1 = common.ownProp;
 var childrenIgnored$1 = common.childrenIgnored;
@@ -2033,7 +2077,7 @@ function GlobSync (pattern, options) {
 }
 
 GlobSync.prototype._finish = function () {
-  assert(this instanceof GlobSync);
+  assert.ok(this instanceof GlobSync);
   if (this.realpath) {
     var self = this;
     this.matches.forEach(function (matchset, index) {
@@ -2057,7 +2101,7 @@ GlobSync.prototype._finish = function () {
 
 
 GlobSync.prototype._process = function (pattern, index, inGlobStar) {
-  assert(this instanceof GlobSync);
+  assert.ok(this instanceof GlobSync);
 
   // Get the first [n] parts of pattern that are all strings.
   var n = 0;
@@ -2094,7 +2138,10 @@ GlobSync.prototype._process = function (pattern, index, inGlobStar) {
   var read;
   if (prefix === null)
     read = '.';
-  else if (pathIsAbsolute(prefix) || pathIsAbsolute(pattern.join('/'))) {
+  else if (pathIsAbsolute(prefix) ||
+      pathIsAbsolute(pattern.map(function (p) {
+        return typeof p === 'string' ? p : '[*]'
+      }).join('/'))) {
     if (!prefix || !pathIsAbsolute(prefix))
       prefix = '/' + prefix;
     read = prefix;
@@ -2229,7 +2276,7 @@ GlobSync.prototype._readdirInGlobStar = function (abs) {
   var entries;
   var lstat;
   try {
-    lstat = fs__default.lstatSync(abs);
+    lstat = this.fs.lstatSync(abs);
   } catch (er) {
     if (er.code === 'ENOENT') {
       // lstat failed, doesn't exist
@@ -2265,7 +2312,7 @@ GlobSync.prototype._readdir = function (abs, inGlobStar) {
   }
 
   try {
-    return this._readdirEntries(abs, fs__default.readdirSync(abs))
+    return this._readdirEntries(abs, this.fs.readdirSync(abs))
   } catch (er) {
     this._readdirError(abs, er);
     return null
@@ -2422,7 +2469,7 @@ GlobSync.prototype._stat = function (f) {
   if (!stat) {
     var lstat;
     try {
-      lstat = fs__default.lstatSync(abs);
+      lstat = this.fs.lstatSync(abs);
     } catch (er) {
       if (er && (er.code === 'ENOENT' || er.code === 'ENOTDIR')) {
         this.statCache[abs] = false;
@@ -2432,7 +2479,7 @@ GlobSync.prototype._stat = function (f) {
 
     if (lstat && lstat.isSymbolicLink()) {
       try {
-        stat = fs__default.statSync(abs);
+        stat = this.fs.statSync(abs);
       } catch (er) {
         stat = lstat;
       }
@@ -2636,7 +2683,12 @@ function slice (args) {
 
 var glob_1 = glob;
 
-var EE = EventEmitter__default.EventEmitter;
+var EE = events__default.EventEmitter;
+
+
+
+
+
 var setopts$2 = common.setopts;
 var ownProp$2 = common.ownProp;
 
@@ -2929,7 +2981,10 @@ Glob$1.prototype._process = function (pattern, index, inGlobStar, cb) {
   var read;
   if (prefix === null)
     read = '.';
-  else if (pathIsAbsolute(prefix) || pathIsAbsolute(pattern.join('/'))) {
+  else if (pathIsAbsolute(prefix) ||
+      pathIsAbsolute(pattern.map(function (p) {
+        return typeof p === 'string' ? p : '[*]'
+      }).join('/'))) {
     if (!prefix || !pathIsAbsolute(prefix))
       prefix = '/' + prefix;
     read = prefix;
@@ -3086,7 +3141,7 @@ Glob$1.prototype._readdirInGlobStar = function (abs, cb) {
   var lstatcb = inflight_1(lstatkey, lstatcb_);
 
   if (lstatcb)
-    fs__default.lstat(abs, lstatcb);
+    self.fs.lstat(abs, lstatcb);
 
   function lstatcb_ (er, lstat) {
     if (er && er.code === 'ENOENT')
@@ -3125,7 +3180,9 @@ Glob$1.prototype._readdir = function (abs, inGlobStar, cb) {
     if (Array.isArray(c))
       return cb(null, c)
   }
-  fs__default.readdir(abs, readdirCb(this, abs, cb));
+
+  var self = this;
+  self.fs.readdir(abs, readdirCb(this, abs, cb));
 };
 
 function readdirCb (self, abs, cb) {
@@ -3327,13 +3384,13 @@ Glob$1.prototype._stat = function (f, cb) {
   var self = this;
   var statcb = inflight_1('stat\0' + abs, lstatcb_);
   if (statcb)
-    fs__default.lstat(abs, statcb);
+    self.fs.lstat(abs, statcb);
 
   function lstatcb_ (er, lstat) {
     if (lstat && lstat.isSymbolicLink()) {
       // If it's a symlink, then treat it as the target, unless
       // the target does not exist, then treat it as a file.
-      return fs__default.stat(abs, function (er, stat) {
+      return self.fs.stat(abs, function (er, stat) {
         if (er)
           self._stat2(f, abs, null, lstat, cb);
         else
@@ -3374,7 +3431,12 @@ rimraf.sync = rimrafSync;
 
 
 
-
+var glob$1 = undefined;
+try {
+  glob$1 = glob_1;
+} catch (_err) {
+  // treat glob as optional.
+}
 var _0666 = parseInt('666', 8);
 
 var defaultGlobOpts = {
@@ -3407,6 +3469,9 @@ function defaults (options) {
   if (options.glob === false) {
     options.disableGlob = true;
   }
+  if (options.disableGlob !== true && glob$1 === undefined) {
+    throw Error('glob dependency not found, set `options.disableGlob = true` if intentional')
+  }
   options.disableGlob = options.disableGlob || false;
   options.glob = options.glob || defaultGlobOpts;
 }
@@ -3429,14 +3494,14 @@ function rimraf (p, options, cb) {
   var errState = null;
   var n = 0;
 
-  if (options.disableGlob || !glob_1.hasMagic(p))
+  if (options.disableGlob || !glob$1.hasMagic(p))
     return afterGlob(null, [p])
 
   options.lstat(p, function (er, stat) {
     if (!er)
       return afterGlob(null, [p])
 
-    glob_1(p, options.glob, afterGlob);
+    glob$1(p, options.glob, afterGlob);
   });
 
   function next (er) {
@@ -3640,14 +3705,14 @@ function rimrafSync (p, options) {
 
   var results;
 
-  if (options.disableGlob || !glob_1.hasMagic(p)) {
+  if (options.disableGlob || !glob$1.hasMagic(p)) {
     results = [p];
   } else {
     try {
       options.lstatSync(p);
       results = [p];
     } catch (er) {
-      results = glob_1.sync(p, options.glob);
+      results = glob$1.sync(p, options.glob);
     }
   }
 
@@ -3738,11 +3803,13 @@ function noop() { }
 exports.mkdirp = mkdirp;
 exports.rimraf = rimraf_1;
 exports.noop = noop;
-exports.fs = fs__default;
+exports.commonjsGlobal = commonjsGlobal;
 exports.unwrapExports = unwrapExports;
 exports.createCommonjsModule = createCommonjsModule;
+exports.getCjsExportFromNamespace = getCjsExportFromNamespace;
+exports.fs = fs__default;
 exports.require$$0 = util__default;
-exports.require$$0$1 = assert;
+exports.assert = assert;
 exports.mkdirp$1 = mkdirp;
 exports.rimraf_1 = rimraf_1;
-//# sourceMappingURL=chunk-275bacad.js.map
+//# sourceMappingURL=chunk-60dc40b2.js.map
