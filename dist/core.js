@@ -67,7 +67,7 @@ function generate_client(manifest_data, path_to_routes, bundler, dev, dev_port) 
             return 'null';
         if (part.params.length > 0) {
             needs_decode = true;
-            var props = part.params.map(function (param, i) { return param + ": d(match[" + (i + 1) + "])"; });
+            var props = part.params.map(function (param, i) { return param.startsWith('...') ? param.slice(3) + ": match[" + (i + 1) + "].split('/').map(e => d(e))" : param + ": d(match[" + (i + 1) + "])"; });
             return "{ i: " + component_indexes[part.component.name] + ", params: match => ({ " + props.join(', ') + " }) }";
         }
         return "{ i: " + component_indexes[part.component.name] + " }";
@@ -107,7 +107,7 @@ function generate_server(manifest_data, path_to_routes, cwd, src, dest, dev) {
             "component: __" + part.component.name
         ];
         if (part.params.length > 0) {
-            var params = part.params.map(function (param, i) { return param + ": d(match[" + (i + 1) + "])"; });
+            var params = part.params.map(function (param, i) { return param.startsWith('...') ? param.slice(3) + ": match[" + (i + 1) + "].split('/').map(e => d(e))" : param + ": d(match[" + (i + 1) + "])"; });
             props.push("params: match => ({ " + params.join(', ') + " })");
         }
         return "{ " + props.join(', ') + " }";
@@ -1168,7 +1168,7 @@ function get_pattern(segments, add_trailing_slash) {
         segments.map(function (segment) {
             return '\\/' + segment.map(function (part) {
                 return part.dynamic
-                    ? part.qualifier || '([^\\/]+?)'
+                    ? part.qualifier || (part.content.startsWith('...') ? '(.+?)' : '([^\\/]+?)')
                     : encodeURI(part.content.normalize())
                         .replace(/\?/g, '%3F')
                         .replace(/#/g, '%23')

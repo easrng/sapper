@@ -293,7 +293,7 @@ function get_pattern(segments: Part[][], add_trailing_slash: boolean) {
 		segments.map(segment => {
 			return '\\/' + segment.map(part => {
 				return part.dynamic
-					? part.qualifier || '([^\\/]+?)'
+					? part.qualifier || (part.content.startsWith('...') ? '(.+?)' : '([^\\/]+?)')
 					: encodeURI(part.content.normalize())
 						.replace(/\?/g, '%3F')
 						.replace(/#/g, '%23')

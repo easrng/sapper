@@ -78,6 +78,15 @@ describe('basics', function() {
 		);
 	});
 
+	it('serves dynamic route with rest parameter', async () => {
+		await page.goto(`${base}/rest/test-slug/uwu`);
+
+		assert.equal(
+			await title(),
+			'TEST-SLUG/UWU'
+		);
+	});
+
 	it('navigates to a new page without reloading', async () => {
 		await page.goto(base);
 		await start();
@@ -120,7 +129,7 @@ describe('basics', function() {
 
 	// TODO equivalent test for a webpack app
 	it('sets Content-Type, Link...modulepreload, and Cache-Control headers', () => {
-		return new Promise((fulfil, reject) => {
+		return new Promise<void>((fulfil, reject) => {
 			const req = http.get(base, res => {
 				try {
 					const { headers } = res;
@@ -253,7 +262,7 @@ describe('basics', function() {
 		await wait(50);
 
 		assert.equal(
-			await page.evaluate(() => document.activeElement.nodeName),
+			await page.evaluate(() => document.activeElement?.nodeName),
 			'BODY'
 		);
 	});

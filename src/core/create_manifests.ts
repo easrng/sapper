@@ -118,7 +118,7 @@ function generate_client(
 
 					if (part.params.length > 0) {
 						needs_decode = true;
-						const props = part.params.map((param, i) => `${param}: d(match[${i + 1}])`);
+						const props = part.params.map((param, i) => param.startsWith('...') ? `${param.slice(3)}: match[${i + 1}].split('/').map(e => d(e))` : `${param}: d(match[${i + 1}])`);
 						return `{ i: ${component_indexes[part.component.name]}, params: match => ({ ${props.join(', ')} }) }`;
 					}
 
@@ -209,7 +209,7 @@ function generate_server(
 							];
 
 							if (part.params.length > 0) {
-								const params = part.params.map((param, i) => `${param}: d(match[${i + 1}])`);
+								const params = part.params.map((param, i) => param.startsWith('...') ? `${param.slice(3)}: match[${i + 1}].split('/').map(e => d(e))` : `${param}: d(match[${i + 1}])`);
 								props.push(`params: match => ({ ${params.join(', ')} })`);
 							}
 

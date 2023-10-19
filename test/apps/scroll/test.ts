@@ -30,7 +30,7 @@ describe('scroll', function() {
 		await start();
 
 		const scrollY = await page.evaluate(() => window.scrollY);
-		assert.ok(scrollY > 0, scrollY);
+		assert.ok(scrollY > 0, ""+scrollY);
 	});
 
 	it('scrolls to any deeplink if it was already active', async () => {
@@ -38,17 +38,17 @@ describe('scroll', function() {
 		await start();
 
 		let scrollY = await page.evaluate(() => window.scrollY);
-		assert.ok(scrollY > 0, scrollY);
+		assert.ok(scrollY > 0, ""+scrollY);
 
 		scrollY = await page.evaluate(() => {
 			window.scrollTo(0, 0)
 			return window.scrollY
 		});
-		assert.ok(scrollY === 0, scrollY);
+		assert.ok(scrollY === 0, ""+scrollY);
 
 		await page.click('[href="tall-page#foo"]');
 		scrollY = await page.evaluate(() => window.scrollY);
-		assert.ok(scrollY > 0, scrollY);
+		assert.ok(scrollY > 0, ""+scrollY);
 	});
 
 	it('resets scroll when a link is clicked', async () => {
