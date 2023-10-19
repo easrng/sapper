@@ -312,6 +312,7 @@ function prepare_page(target) {
                 level.props.path = path;
                 level.props.query = query;
                 level.props.child = Object.assign({}, level.props.child);
+                level.props.params = get_params(target.match);
                 nullable_depth += 1;
             }
             else {
