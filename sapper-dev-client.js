@@ -17,12 +17,18 @@ export function connect(port) {
 
 	window.source = source;
 
+	let unloading;
+	window.addEventListener('beforeunload', () => {
+		unloading = true;
+		source.close();
+	})
+
 	source.onopen = function(event) {
 		console.log(`[SAPPER] dev client connected`);
 	};
 
 	source.onerror = function(error) {
-		console.error(error);
+		if(!unloading) console.error(error);
 	};
 
 	source.onmessage = function(event) {
