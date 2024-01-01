@@ -604,7 +604,7 @@ if (!__chunk_3.fs[gracefulQueue]) {
   if (/\bgfs4\b/i.test(process.env.NODE_DEBUG || '')) {
     process.on('exit', function() {
       debug(__chunk_3.fs[gracefulQueue]);
-      __chunk_3.assert.equal(__chunk_3.fs[gracefulQueue].length, 0);
+      __chunk_3.require$$0$1.equal(__chunk_3.fs[gracefulQueue].length, 0);
     });
   }
 }

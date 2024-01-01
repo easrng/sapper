@@ -587,123 +587,41 @@ var RollupCompiler = /** @class */ (function () {
     return RollupCompiler;
 }());
 
-const { FORCE_COLOR, NODE_DISABLE_COLORS, TERM } = process.env;
+let FORCE_COLOR, NODE_DISABLE_COLORS, NO_COLOR, TERM, isTTY=true;
+if (typeof process !== 'undefined') {
+	({ FORCE_COLOR, NODE_DISABLE_COLORS, NO_COLOR, TERM } = process.env || {});
+	isTTY = process.stdout && process.stdout.isTTY;
+}
 
 const $ = {
-	enabled: !NODE_DISABLE_COLORS && TERM !== 'dumb' && FORCE_COLOR !== '0',
-
-	// modifiers
-	reset: init(0, 0),
-	bold: init(1, 22),
-	dim: init(2, 22),
-	italic: init(3, 23),
-	underline: init(4, 24),
-	inverse: init(7, 27),
-	hidden: init(8, 28),
-	strikethrough: init(9, 29),
-
-	// colors
-	black: init(30, 39),
-	red: init(31, 39),
-	green: init(32, 39),
-	yellow: init(33, 39),
-	blue: init(34, 39),
-	magenta: init(35, 39),
-	cyan: init(36, 39),
-	white: init(37, 39),
-	gray: init(90, 39),
-	grey: init(90, 39),
-
-	// background colors
-	bgBlack: init(40, 49),
-	bgRed: init(41, 49),
-	bgGreen: init(42, 49),
-	bgYellow: init(43, 49),
-	bgBlue: init(44, 49),
-	bgMagenta: init(45, 49),
-	bgCyan: init(46, 49),
-	bgWhite: init(47, 49)
+	enabled: !NODE_DISABLE_COLORS && NO_COLOR == null && TERM !== 'dumb' && (
+		FORCE_COLOR != null && FORCE_COLOR !== '0' || isTTY
+	)
 };
 
-function run(arr, str) {
-	let i=0, tmp, beg='', end='';
-	for (; i < arr.length; i++) {
-		tmp = arr[i];
-		beg += tmp.open;
-		end += tmp.close;
-		if (str.includes(tmp.close)) {
-			str = str.replace(tmp.rgx, tmp.close + tmp.open);
-		}
-	}
-	return beg + str + end;
-}
+function init(x, y) {
+	let rgx = new RegExp(`\\x1b\\[${y}m`, 'g');
+	let open = `\x1b[${x}m`, close = `\x1b[${y}m`;
 
-function chain(has, keys) {
-	let ctx = { has, keys };
-
-	ctx.reset = $.reset.bind(ctx);
-	ctx.bold = $.bold.bind(ctx);
-	ctx.dim = $.dim.bind(ctx);
-	ctx.italic = $.italic.bind(ctx);
-	ctx.underline = $.underline.bind(ctx);
-	ctx.inverse = $.inverse.bind(ctx);
-	ctx.hidden = $.hidden.bind(ctx);
-	ctx.strikethrough = $.strikethrough.bind(ctx);
-
-	ctx.black = $.black.bind(ctx);
-	ctx.red = $.red.bind(ctx);
-	ctx.green = $.green.bind(ctx);
-	ctx.yellow = $.yellow.bind(ctx);
-	ctx.blue = $.blue.bind(ctx);
-	ctx.magenta = $.magenta.bind(ctx);
-	ctx.cyan = $.cyan.bind(ctx);
-	ctx.white = $.white.bind(ctx);
-	ctx.gray = $.gray.bind(ctx);
-	ctx.grey = $.grey.bind(ctx);
-
-	ctx.bgBlack = $.bgBlack.bind(ctx);
-	ctx.bgRed = $.bgRed.bind(ctx);
-	ctx.bgGreen = $.bgGreen.bind(ctx);
-	ctx.bgYellow = $.bgYellow.bind(ctx);
-	ctx.bgBlue = $.bgBlue.bind(ctx);
-	ctx.bgMagenta = $.bgMagenta.bind(ctx);
-	ctx.bgCyan = $.bgCyan.bind(ctx);
-	ctx.bgWhite = $.bgWhite.bind(ctx);
-
-	return ctx;
-}
-
-function init(open, close) {
-	let blk = {
-		open: `\x1b[${open}m`,
-		close: `\x1b[${close}m`,
-		rgx: new RegExp(`\\x1b\\[${close}m`, 'g')
-	};
 	return function (txt) {
-		if (this !== void 0 && this.has !== void 0) {
-			this.has.includes(open) || (this.has.push(open),this.keys.push(blk));
-			return txt === void 0 ? this : $.enabled ? run(this.keys, txt+'') : txt+'';
-		}
-		return txt === void 0 ? chain([open], [blk]) : $.enabled ? run([blk], txt+'') : txt+'';
+		if (!$.enabled || txt == null) return txt;
+		return open + (!!~(''+txt).indexOf(close) ? txt.replace(rgx, close + open) : txt) + close;
 	};
 }
-
-var kleur = $;
+const inverse = init(7, 27);
 
 /**
  * This has been adapted from `create-react-app`, authored by Facebook, Inc.
  * see: https://github.com/facebookincubator/create-react-app/tree/master/packages/react-dev-utils
  */
 
-
-
 const errorLabel = 'Syntax error:';
-const isLikelyASyntaxError = str => str.includes(errorLabel);
+const isLikelySyntaxError = str => str.includes(errorLabel);
 
 const exportRegex = /\s*(.+?)\s*(")?export '(.+?)' was not found in '(.+?)'/;
 const stackRegex = /^\s*at\s((?!webpack:).)*:\d+:\d+[\s\)]*(\n|$)/gm;
 
-function formatMessage(message, isError) {
+function formatMessage(message) {
 	// Workaround to accommodate Webpack v5
 	// It gives us an Object now, not a string...
 	// Objects not identical; details > stack > message
@@ -752,23 +670,23 @@ function formatMessage(message, isError) {
 		lines[1] = lines[1].replace(exportRegex, "$1 '$4' does not contain an export named '$3'.");
 	}
 
-	lines[0] = kleur.inverse(lines[0]);
+	lines[0] = inverse(lines[0]);
 
 	// Reassemble & Strip internal tracing, except `webpack:` -- (create-react-app/pull/1050)
 	return lines.join('\n').replace(stackRegex, '').trim();
 }
 
-var webpackFormatMessages = function (stats) {
-	const json = stats.toJson({}, true);
+function formatMessages(stats) {
+	const { errors, warnings } = stats.toJson({}, true);
 
 	const result = {
-		errors: json.errors.map(msg => formatMessage(msg, true)),
-		warnings: json.warnings.map(msg => formatMessage(msg, false))
+		errors: errors.map(formatMessage),
+		warnings: warnings.map(formatMessage),
 	};
 
 	// Only show syntax errors if we have them
-	if (result.errors.some(isLikelyASyntaxError)) {
-		result.errors = result.errors.filter(isLikelyASyntaxError);
+	if (result.errors.some(isLikelySyntaxError)) {
+		result.errors = result.errors.filter(isLikelySyntaxError);
 	}
 
 	// First error is usually it; others usually the same
@@ -777,10 +695,7 @@ var webpackFormatMessages = function (stats) {
 	}
 
 	return result;
-};
-
-var formatMessage_1 = formatMessage;
-webpackFormatMessages.formatMessage = formatMessage_1;
+}
 
 var locPattern = /\((\d+):(\d+)\)$/;
 function munge_warning_or_error$1(message) {
@@ -807,7 +722,7 @@ var WebpackResult = /** @class */ (function () {
     function WebpackResult(stats) {
         this.stats = stats;
         var info = stats.toJson();
-        var messages = webpackFormatMessages(stats);
+        var messages = formatMessages(stats);
         this.errors = messages.errors.map(munge_warning_or_error$1);
         this.warnings = messages.warnings.map(munge_warning_or_error$1);
         this.duration = info.time;
