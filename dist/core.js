@@ -587,115 +587,132 @@ var RollupCompiler = /** @class */ (function () {
     return RollupCompiler;
 }());
 
-let FORCE_COLOR, NODE_DISABLE_COLORS, NO_COLOR, TERM, isTTY=true;
-if (typeof process !== 'undefined') {
-	({ FORCE_COLOR, NODE_DISABLE_COLORS, NO_COLOR, TERM } = process.env || {});
-	isTTY = process.stdout && process.stdout.isTTY;
-}
-
-const $ = {
-	enabled: !NODE_DISABLE_COLORS && NO_COLOR == null && TERM !== 'dumb' && (
-		FORCE_COLOR != null && FORCE_COLOR !== '0' || isTTY
-	)
-};
-
-function init(x, y) {
-	let rgx = new RegExp(`\\x1b\\[${y}m`, 'g');
-	let open = `\x1b[${x}m`, close = `\x1b[${y}m`;
-
-	return function (txt) {
-		if (!$.enabled || txt == null) return txt;
-		return open + (!!~(''+txt).indexOf(close) ? txt.replace(rgx, close + open) : txt) + close;
-	};
-}
-const inverse = init(7, 27);
-
 /**
- * This has been adapted from `create-react-app`, authored by Facebook, Inc.
- * see: https://github.com/facebookincubator/create-react-app/tree/master/packages/react-dev-utils
+ * Copyright (c) 2015-present, Facebook, Inc.
+ *
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
  */
 
-const errorLabel = 'Syntax error:';
-const isLikelySyntaxError = str => str.includes(errorLabel);
+const friendlySyntaxErrorLabel = 'Syntax error:';
 
-const exportRegex = /\s*(.+?)\s*(")?export '(.+?)' was not found in '(.+?)'/;
-const stackRegex = /^\s*at\s((?!webpack:).)*:\d+:\d+[\s\)]*(\n|$)/gm;
+function isLikelyASyntaxError(message) {
+  return message.indexOf(friendlySyntaxErrorLabel) !== -1;
+}
 
+// Cleans up webpack error messages.
 function formatMessage(message) {
-	// Workaround to accommodate Webpack v5
-	// It gives us an Object now, not a string...
-	// Objects not identical; details > stack > message
-	if (typeof message === 'object') {
-		message = message.details || message.stack || message.message;
-	}
+  let lines = [];
 
-	let lines = message.split('\n');
+  if (typeof message === 'string') {
+    lines = message.split('\n');
+  } else if ('message' in message) {
+    lines = message['message'].split('\n');
+  } else if (Array.isArray(message)) {
+    message.forEach(message => {
+      if ('message' in message) {
+        lines = message['message'].split('\n');
+      }
+    });
+  }
 
-	if (lines.length > 2 && lines[1] === '') {
-		lines.splice(1, 1); // Remove extra newline.
-	}
+  // Strip webpack-added headers off errors/warnings
+  // https://github.com/webpack/webpack/blob/master/lib/ModuleError.js
+  lines = lines.filter(line => !/Module [A-z ]+\(from/.test(line));
 
-	// Remove loader notation from filenames:
-	//   `./~/css-loader!./src/App.css` ~~> `./src/App.css`
-	if (lines[0].lastIndexOf('!') !== -1) {
-		lines[0] = lines[0].substr(lines[0].lastIndexOf('!') + 1);
-	}
+  // Transform parsing error into syntax error
+  // TODO: move this to our ESLint formatter?
+  lines = lines.map(line => {
+    const parsingError = /Line (\d+):(?:(\d+):)?\s*Parsing error: (.+)$/.exec(
+      line
+    );
+    if (!parsingError) {
+      return line;
+    }
+    const [, errorLine, errorColumn, errorMessage] = parsingError;
+    return `${friendlySyntaxErrorLabel} ${errorMessage} (${errorLine}:${errorColumn})`;
+  });
 
-	// Remove useless `entry` filename stack details
-	lines = lines.filter(line => line.indexOf(' @ ') !== 0);
+  message = lines.join('\n');
+  // Smoosh syntax errors (commonly found in CSS)
+  message = message.replace(
+    /SyntaxError\s+\((\d+):(\d+)\)\s*(.+?)\n/g,
+    `${friendlySyntaxErrorLabel} $3 ($1:$2)\n`
+  );
+  // Clean up export errors
+  message = message.replace(
+    /^.*export '(.+?)' was not found in '(.+?)'.*$/gm,
+    `Attempted import error: '$1' is not exported from '$2'.`
+  );
+  message = message.replace(
+    /^.*export 'default' \(imported as '(.+?)'\) was not found in '(.+?)'.*$/gm,
+    `Attempted import error: '$2' does not contain a default export (imported as '$1').`
+  );
+  message = message.replace(
+    /^.*export '(.+?)' \(imported as '(.+?)'\) was not found in '(.+?)'.*$/gm,
+    `Attempted import error: '$1' is not exported from '$3' (imported as '$2').`
+  );
+  lines = message.split('\n');
 
-	// 0 ~> filename; 1 ~> main err msg
-	if (!lines[0] || !lines[1]) {
-		return lines.join('\n');
-	}
+  // Remove leading newline
+  if (lines.length > 2 && lines[1].trim() === '') {
+    lines.splice(1, 1);
+  }
+  // Clean up file name
+  lines[0] = lines[0].replace(/^(.*) \d+:\d+-\d+$/, '$1');
 
-	// Cleans up verbose "module not found" messages for files and packages.
-	if (lines[1].startsWith('Module not found: ')) {
-		lines = [
-			lines[0],
-			lines[1] // "Module not found: " is enough detail
-				.replace("Cannot resolve 'file' or 'directory' ", '')
-				.replace('Cannot resolve module ', '')
-				.replace('Error: ', '')
-				.replace('[CaseSensitivePathsPlugin] ', '')
-		];
-	}
+  // Cleans up verbose "module not found" messages for files and packages.
+  if (lines[1] && lines[1].indexOf('Module not found: ') === 0) {
+    lines = [
+      lines[0],
+      lines[1]
+        .replace('Error: ', '')
+        .replace('Module not found: Cannot find file:', 'Cannot find file:'),
+    ];
+  }
 
-	// Cleans up syntax error messages.
-	if (lines[1].startsWith('Module build failed: ')) {
-		lines[1] = lines[1].replace('Module build failed: SyntaxError:', errorLabel);
-	}
+  // Add helpful message for users trying to use Sass for the first time
+  if (lines[1] && lines[1].match(/Cannot find module.+sass/)) {
+    lines[1] = 'To import Sass files, you first need to install sass.\n';
+    lines[1] +=
+      'Run `npm install sass` or `yarn add sass` inside your workspace.';
+  }
 
-	if (lines[1].match(exportRegex)) {
-		lines[1] = lines[1].replace(exportRegex, "$1 '$4' does not contain an export named '$3'.");
-	}
+  message = lines.join('\n');
+  // Internal stacks are generally useless so we strip them... with the
+  // exception of stacks containing `webpack:` because they're normally
+  // from user code generated by webpack. For more information see
+  // https://github.com/facebook/create-react-app/pull/1050
+  message = message.replace(
+    /^\s*at\s((?!webpack:).)*:\d+:\d+[\s)]*(\n|$)/gm,
+    ''
+  ); // at ... ...:x:y
+  message = message.replace(/^\s*at\s<anonymous>(\n|$)/gm, ''); // at <anonymous>
+  lines = message.split('\n');
 
-	lines[0] = inverse(lines[0]);
+  // Remove duplicated newlines
+  lines = lines.filter(
+    (line, index, arr) =>
+      index === 0 || line.trim() !== '' || line.trim() !== arr[index - 1].trim()
+  );
 
-	// Reassemble & Strip internal tracing, except `webpack:` -- (create-react-app/pull/1050)
-	return lines.join('\n').replace(stackRegex, '').trim();
+  // Reassemble the message
+  message = lines.join('\n');
+  return message.trim();
 }
 
-function formatMessages(stats) {
-	const { errors, warnings } = stats.toJson({}, true);
-
-	const result = {
-		errors: errors.map(formatMessage),
-		warnings: warnings.map(formatMessage),
-	};
-
-	// Only show syntax errors if we have them
-	if (result.errors.some(isLikelySyntaxError)) {
-		result.errors = result.errors.filter(isLikelySyntaxError);
-	}
-
-	// First error is usually it; others usually the same
-	if (result.errors.length > 1) {
-		result.errors.length = 1;
-	}
-
-	return result;
+function formatWebpackMessages(json) {
+  const formattedErrors = json.errors.map(formatMessage);
+  const formattedWarnings = json.warnings.map(formatMessage);
+  const result = { errors: formattedErrors, warnings: formattedWarnings };
+  if (result.errors.some(isLikelyASyntaxError)) {
+    // If there are any syntax errors, show just them.
+    result.errors = result.errors.filter(isLikelyASyntaxError);
+  }
+  return result;
 }
+
+var formatWebpackMessages_1 = formatWebpackMessages;
 
 var locPattern = /\((\d+):(\d+)\)$/;
 function munge_warning_or_error$1(message) {
@@ -722,7 +739,7 @@ var WebpackResult = /** @class */ (function () {
     function WebpackResult(stats) {
         this.stats = stats;
         var info = stats.toJson();
-        var messages = formatMessages(stats);
+        var messages = formatWebpackMessages_1(info);
         this.errors = messages.errors.map(munge_warning_or_error$1);
         this.warnings = messages.warnings.map(munge_warning_or_error$1);
         this.duration = info.time;

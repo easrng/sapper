@@ -1,4 +1,4 @@
-import format_messages from 'webpack-format-messages';
+import format_messages from 'react-dev-utils/formatWebpackMessages';
 import { CompileResult, BuildInfo, CompileError, Chunk, CssFile } from './interfaces';
 import { ManifestData, Dirs } from '../../interfaces';
 
@@ -43,7 +43,7 @@ export default class WebpackResult implements CompileResult {
 
 		const info = stats.toJson();
 
-		const messages = format_messages(stats);
+		const messages = format_messages(info);
 
 		this.errors = messages.errors.map(munge_warning_or_error);
 		this.warnings = messages.warnings.map(munge_warning_or_error);
